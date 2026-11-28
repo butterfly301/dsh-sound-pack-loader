@@ -8,6 +8,7 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-sound-pack-loader';
     const POLL_ROUTE = '/sound-pack-loader/poll';
     const CUSTOM_ROUTE = '/sound-pack-loader/custom';
+    const LOCALE_ROUTE = '/sound-pack-loader/locale';
     const PREVIEW_EVENT = 'dsh:sound-pack-loader:preview';
     const UPDATED_EVENT = 'dsh:sound-pack-loader:updated';
     const POLL_MS = 1000;
@@ -18,67 +19,6 @@ window.__ModuleLoader__.load({
     const FALLBACK_PREVIEW_VOLUME = 0.6;
     const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
     const SOUND_ACCEPT = '.wav,.mp3,.ogg,.m4a,.flac,.webm,audio/wav,audio/mpeg,audio/ogg,audio/mp4,audio/flac,audio/webm';
-
-    const UI_COPY = {
-      zh: {
-        nav: '通知音效',
-        title: '通知音效',
-        hint: '为任务完成、异常失败与等待确认配置提醒音效；用户主动取消任务保持静音。上传限制为 2 MB，最长播放 10 秒。',
-        muted: '总静音',
-        triggerMode: '触发时机',
-        triggerBg: '仅后台或失焦',
-        triggerAlways: '始终提醒',
-        volume: '总音量',
-        completed: '任务完成',
-        failed: '异常失败',
-        waiting: '等待用户确认',
-        defaultSlot: '内置默认音效',
-        noSlot: '未设置自定义音频',
-        upload: '上传音频',
-        reset: '恢复默认',
-        preview: '试听',
-        uploaded: '已更新并试听',
-        resetDone: '已恢复默认',
-        tooLarge: '音频文件超出大小限制。',
-        decodeFailed: '当前环境无法解码该音频文件。',
-        unsupported: '仅支持 WAV、MP3、OGG、M4A、FLAC、WebM 音频文件。',
-        uploadFailed: '上传失败，请稍后重试。',
-        unavailable: '宿主音频接口不可用。',
-        save: '保存',
-        saving: '保存中…',
-        saved: '已保存',
-        loading: '加载中…',
-      },
-      en: {
-        nav: 'Notify sound',
-        title: 'Notification sounds',
-        hint: 'Configure audio alerts for completed, failed, and waiting-for-confirmation turns. Manual cancellations stay silent. Max 2 MB per file, capped at 10s.',
-        muted: 'Mute all',
-        triggerMode: 'Trigger timing',
-        triggerBg: 'Background only',
-        triggerAlways: 'Always notify',
-        volume: 'Master volume',
-        completed: 'Task completed',
-        failed: 'Task failed',
-        waiting: 'Waiting for confirmation',
-        defaultSlot: 'Pack default sound',
-        noSlot: 'No custom audio set',
-        upload: 'Upload audio',
-        reset: 'Restore default',
-        preview: 'Preview',
-        uploaded: 'Updated and previewed',
-        resetDone: 'Restored default',
-        tooLarge: 'Audio file exceeds the size limit.',
-        decodeFailed: 'Cannot decode this audio file in the desktop player.',
-        unsupported: 'Only WAV, MP3, OGG, M4A, FLAC, and WebM files are supported.',
-        uploadFailed: 'Audio upload failed; please try again.',
-        unavailable: 'Host audio storage is unavailable.',
-        save: 'Save',
-        saving: 'Saving…',
-        saved: 'Saved',
-        loading: 'Loading…',
-      },
-    };
 
     const SETTINGS_CSS = `
 .ns-panel {
@@ -249,6 +189,8 @@ window.__ModuleLoader__.load({
         try {
           if (typeof entry.audio.pause === 'function') entry.audio.pause();
           if ('currentTime' in entry.audio) entry.audio.currentTime = 0;
+          if (typeof entry.audio.removeAttribute === 'function') entry.audio.removeAttribute('src');
+          if (typeof entry.audio.load === 'function') entry.audio.load();
         } catch {}
         if (active === entry) active = null;
       };
@@ -331,9 +273,9 @@ window.__ModuleLoader__.load({
       const h = R.createElement;
 
       function copyOf(locale) {
-        const active = locale?.getSnapshot?.()?.active || '';
-        const primary = String(active).split(/[-_]/)[0].toLowerCase();
-        return primary === 'zh' ? UI_COPY.zh : UI_COPY.en;
+        const bound = locale && typeof locale.bind === 'function' ? locale.bind(NS) : null;
+        if (!bound) return {};
+        return new Proxy({}, { get: (_target, key) => bound(String(key)) });
       }
 
       return function NotifySoundSettingsPanel({ form, locale, saveOps }) {
@@ -619,29 +561,45 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['configForms'],
+      inject: ['configForms', 'locale'],
       apply(ctx) {
+        const dicts = new Set();
+        const loadUi = () => {
+          if (typeof fetch !== 'function') return;
+          const active = ctx.locale?.getSnapshot?.()?.active || 'en';
+          const lang = String(active).split(/[-_]/)[0].toLowerCase() || 'en';
+          if (dicts.has(lang)) return;
+          dicts.add(lang);
+          fetch(`${LOCALE_ROUTE}/${encodeURIComponent(lang)}.json`, { cache: 'no-store' })
+            .then((res) => (res && res.ok ? res.json() : null))
+            .then((payload) => {
+              if (!payload || typeof payload.ui !== 'object' || !payload.ui) {
+                dicts.delete(lang);
+                return;
+              }
+              try { ctx.locale.register(NS, payload.lang || lang, payload.ui); } catch {}
+            })
+            .catch(() => { dicts.delete(lang); });
+        };
+        ctx.effect(() => {
+          loadUi();
+          const unsub = typeof ctx.locale.subscribe === 'function' ? ctx.locale.subscribe(loadUi) : undefined;
+          return () => { try { unsub?.(); } catch {} };
+        }, 'dsh-sound-pack-loader: ui locale');
         let stopSettingsUi;
         if (React && typeof ctx.inject === 'function') {
           const Panel = createSettingsPanelComponent(React);
-          stopSettingsUi = ctx.inject(['slots', 'remote', 'remote.settings', 'locale'], (scope) => {
+          stopSettingsUi = ctx.inject(['slots', 'locale'], (scope) => {
             const mount = () => {
               const form = ctx.configForms.get(NS);
               const locale = scope.locale || ctx.locale;
               const getLabel = () => {
-                const active = locale?.getSnapshot?.()?.active || '';
-                return String(active).split(/[-_]/)[0].toLowerCase() === 'zh' ? UI_COPY.zh.nav : UI_COPY.en.nav;
+                const bound = locale && typeof locale.bind === 'function' ? locale.bind(NS) : null;
+                return bound ? bound('nav') : '';
               };
               const saveOps = async (ops, revision) => {
-                const settingsRemote = scope.remote?.settings;
-                if (!settingsRemote) throw new Error('settingsRemoteUnavailable');
-                const res = await settingsRemote.mutate(NS, ops, revision);
-                if (res.ok) {
-                  ctx.configForms.describe?.().acceptView?.(res.value);
-                } else {
-                  await ctx.configForms.describe?.().load?.();
-                  throw new Error(res.error?.message || res.error?.code || 'persistFailed');
-                }
+                const accepted = await form.mutate(ops, revision);
+                if (!accepted) throw new Error('persistFailed');
               };
               const regStop = scope.slots.inject('settings.section', () => scope.slots.register(
                 { name: 'settings.section', id: NS, order: 92, label: getLabel },
@@ -719,6 +677,20 @@ window.__ModuleLoader__.load({
             player.play(src, cfg.volume);
           };
 
+          const stopApproval = typeof ctx.inject === 'function'
+            ? ctx.inject(['remote'], (scope) => scope.effect(() => {
+                try {
+                  const off = scope.remote.$on('approval/request', function (request, next) {
+                    try { handleEvent('waiting'); } catch {}
+                    return next();
+                  });
+                  return () => { try { off?.(); } catch {} };
+                } catch {
+                  return undefined;
+                }
+              }, 'dsh-sound-pack-loader: approval waiting'))
+            : undefined;
+
           const onPreview = (event) => {
             const detail = event?.detail;
             const kind = detail?.kind;
@@ -744,23 +716,31 @@ window.__ModuleLoader__.load({
             }
           };
 
+          let pollController = null;
           const poll = () => {
             if (disposed || !isActiveSource() || typeof fetch !== 'function') return;
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            pollController = controller;
             const query = cursor === null ? '' : `?since=${encodeURIComponent(String(cursor))}`;
-            fetch(`${POLL_ROUTE}${query}`, { cache: 'no-store' })
+            fetch(`${POLL_ROUTE}${query}`, {
+              cache: 'no-store',
+              ...(controller ? { signal: controller.signal } : {}),
+            })
               .then((res) => (res && res.ok ? res.json() : null))
               .then((payload) => {
                 if (disposed || !payload || payload.ok !== true) return;
                 if (typeof payload.cursor === 'number') cursor = payload.cursor;
                 if (!Array.isArray(payload.events)) return;
-                const now = Date.now();
                 for (const evt of payload.events) {
                   if (evt && typeof evt.kind === 'string') {
-                    handleEvent(evt.kind, now);
+                    handleEvent(evt.kind, typeof evt.at === 'number' ? evt.at : Date.now());
                   }
                 }
               })
-              .catch(() => {});
+              .catch(() => {})
+              .finally(() => {
+                if (pollController === controller) pollController = null;
+              });
           };
 
           if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -776,7 +756,10 @@ window.__ModuleLoader__.load({
 
           return () => {
             disposed = true;
+            pollController?.abort();
+            pollController = null;
             clearInterval(timer);
+            try { stopApproval?.dispose?.(); } catch {}
             player.stop();
             if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
               window.removeEventListener(PREVIEW_EVENT, onPreview);

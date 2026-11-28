@@ -1,6 +1,6 @@
 {
   "name": "dsh-sound-pack-loader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Plays configured notification chimes for completed, failed, and waiting-for-confirmation agent events when the window is in the background.",
   "license": "MIT",
@@ -37,6 +37,7 @@
     "test": "node --test \"test/*.test.js\""
   },
   "files": [
+    "cordis.patch.yml",
     "index.js",
     "client.js",
     "host",
@@ -53,6 +54,9 @@
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-locale"
       ]
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   }
 }

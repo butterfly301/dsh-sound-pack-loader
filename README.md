@@ -13,7 +13,7 @@
 dsh plugin --profile desktop add dsh-sound-pack-loader
 ```
 
-可在 `cordis.patch.yml` 中注入默认主题音效包：
+独立安装后默认没有音频，需要先在设置页上传，或在配置里提供 `pack.sounds`。可在 `cordis.patch.yml` 中注入默认音效包：
 
 ```yaml
 - insert:

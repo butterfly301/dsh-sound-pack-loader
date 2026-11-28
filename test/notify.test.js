@@ -29,32 +29,25 @@ function makeId3Mp3(bytes = 32) {
   return buf;
 }
 
-test('classifySessionEvent separates completed, failed, waiting, and ignores cancelled', () => {
+test('classifySessionEvent separates completed and failed and ignores cancelled', () => {
   assert.equal(classifySessionEvent({ type: 'turn/end', data: { reason: { kind: 'completed' } } }), 'completed');
   assert.equal(classifySessionEvent({ type: 'turn/end', data: { reason: { kind: 'error' } } }), 'failed');
   assert.equal(classifySessionEvent({ type: 'turn/end', data: { reason: { kind: 'max-tokens' } } }), 'failed');
   assert.equal(classifySessionEvent({ type: 'turn/end', data: { reason: { kind: 'aborted' } } }), null);
   assert.equal(classifySessionEvent({ type: 'turn/end', data: { reason: { kind: 'interrupted' } } }), null);
-  assert.equal(classifySessionEvent({ type: 'tool/approval-requested' }), 'waiting');
+  assert.equal(classifySessionEvent({ type: 'approval/asked' }), null);
 });
 
-test('createSoundEventTracker skips pre-existing history and captures new events across sessions', () => {
-  const s1Events = [{ type: 'turn/end', data: { reason: { kind: 'completed' } } }];
-  const s2Events = [];
-  const sessions = new Map([
-    ['s1', { id: 's1', get seq() { return s1Events.length; }, eventAt: (i) => s1Events[i] }],
-    ['s2', { id: 's2', get seq() { return s2Events.length; }, eventAt: (i) => s2Events[i] }],
-  ]);
-
+test('createSoundEventTracker queues new session events across sessions', () => {
   const tracker = createSoundEventTracker();
-  const initial = tracker.poll(sessions, null);
+  const initial = tracker.poll(null);
   assert.equal(initial.events.length, 0);
 
-  s1Events.push({ type: 'turn/end', data: { reason: { kind: 'error' } } });
-  s2Events.push({ type: 'turn/end', data: { reason: { kind: 'completed' } } });
-  s2Events.push({ type: 'turn/end', data: { reason: { kind: 'aborted' } } });
+  tracker.handle('s1', { type: 'turn/end', data: { reason: { kind: 'error' } }, time: 10 });
+  tracker.handle('s2', { type: 'turn/end', data: { reason: { kind: 'completed' } }, time: 11 });
+  tracker.handle('s2', { type: 'turn/end', data: { reason: { kind: 'aborted' } }, time: 12 });
 
-  const next = tracker.poll(sessions, initial.cursor);
+  const next = tracker.poll(initial.cursor);
   assert.deepEqual(next.events.map((e) => [e.sessionId, e.kind]), [
     ['s1', 'failed'],
     ['s2', 'completed'],
@@ -178,6 +171,9 @@ test('client handles triggerMode, single-channel interruption, 10s fade-out cap,
     Audio: AudioMock,
     Date: { now: () => now },
     fetch: async (url) => {
+      if (String(url).includes('/locale/')) {
+        return { ok: true, json: async () => ({ lang: 'en', ui: {} }) };
+      }
       if (String(url).startsWith('/sound-pack-loader/custom')) {
         return { ok: true, json: async () => ({ ok: true, slots: customSlots }) };
       }
@@ -210,6 +206,7 @@ test('client handles triggerMode, single-channel interruption, 10s fade-out cap,
 
   let cleanup = null;
   loadedMod.factory().apply({
+    locale: { getSnapshot: () => ({ active: 'en' }), bind: () => (key) => key, subscribe: () => () => {}, register: () => () => {} },
     configForms: {
       get: () => ({
         getSnapshot: () => ({ status: 'ready', value: formValue }),
@@ -300,8 +297,10 @@ test('registers standalone settings.section when React and slots/remote.settings
   };
   let slotDisposed = 0;
   let scopeEffectCalls = 0;
+  const zhUi = JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8')).ui;
+  const dict = (key) => zhUi[key] ?? key;
   const scope = {
-    locale: { getSnapshot: () => ({ active: 'zh' }) },
+    locale: { getSnapshot: () => ({ active: 'zh' }), bind: () => dict, subscribe: () => () => {}, register: () => () => {} },
     slots: {
       inject: (_name, fn) => fn(),
       register: (meta, render) => {
@@ -317,6 +316,9 @@ test('registers standalone settings.section when React and slots/remote.settings
     locale: scope.locale,
     effect: (fn) => fn(),
     inject: (deps, fn) => {
+      if (!deps.includes('locale')) {
+        return fn({ remote: { $on: () => () => {} }, effect: (run) => run() });
+      }
       assert.equal(deps.includes('locale'), true);
       return fn(scope);
     },

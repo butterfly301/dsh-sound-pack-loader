@@ -1,1 +1,35 @@
-{"meta":{"title":"Notification sounds","description":"Plays configured short notification chimes for task completion, errors, and confirmation prompts while the window is in the background."}}
+{
+  "meta": {
+    "title": "Notify sound",
+    "description": "Plays theme short sounds for completed, failed, and waiting-for-confirmation events while the window is in the background, with mute, volume, per-event toggles, and anti-repeat throttling."
+  },
+  "ui": {
+    "nav": "Notify sound",
+    "title": "Notification sounds",
+    "hint": "Configure audio alerts for completed, failed, and waiting-for-confirmation turns. Manual cancellations stay silent. Max 2 MB per file, capped at 10s.",
+    "muted": "Mute all",
+    "triggerMode": "Trigger timing",
+    "triggerBg": "Background only",
+    "triggerAlways": "Always notify",
+    "volume": "Master volume",
+    "completed": "Task completed",
+    "failed": "Task failed",
+    "waiting": "Waiting for confirmation",
+    "defaultSlot": "Pack default sound",
+    "noSlot": "No custom audio set",
+    "upload": "Upload audio",
+    "reset": "Restore default",
+    "preview": "Preview",
+    "uploaded": "Updated and previewed",
+    "resetDone": "Restored default",
+    "tooLarge": "Audio file exceeds the size limit.",
+    "decodeFailed": "Cannot decode this audio file in the desktop player.",
+    "unsupported": "Only WAV, MP3, OGG, M4A, FLAC, and WebM files are supported.",
+    "uploadFailed": "Audio upload failed; please try again.",
+    "unavailable": "Host audio storage is unavailable.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "loading": "Loading…"
+  }
+}

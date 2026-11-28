@@ -30,7 +30,6 @@ export function sanitizeSoundFileName(raw) {
 export function detectAudioFormat(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.byteLength < 12) return null;
 
-  // WAV: RIFF....WAVE
   if (
     buffer.subarray(0, 4).toString('ascii') === 'RIFF'
     && buffer.subarray(8, 12).toString('ascii') === 'WAVE'
@@ -38,7 +37,6 @@ export function detectAudioFormat(buffer) {
     return FORMATS[0];
   }
 
-  // MP3: ID3 tag or MPEG audio frame sync
   if (buffer.subarray(0, 3).toString('ascii') === 'ID3') {
     return FORMATS[1];
   }
@@ -51,17 +49,14 @@ export function detectAudioFormat(buffer) {
     return FORMATS[1];
   }
 
-  // OGG: OggS
   if (buffer.subarray(0, 4).toString('ascii') === 'OggS') {
     return FORMATS[2];
   }
 
-  // FLAC: fLaC
   if (buffer.subarray(0, 4).toString('ascii') === 'fLaC') {
     return FORMATS[3];
   }
 
-  // M4A / MP4 audio: ISO BMFF ftyp box at offset 4
   if (buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
     const boxSize = buffer.readUInt32BE(0);
     if (boxSize >= 16 && boxSize <= buffer.byteLength) {
@@ -69,7 +64,6 @@ export function detectAudioFormat(buffer) {
     }
   }
 
-  // WebM / Matroska: EBML header 1A 45 DF A3
   if (
     buffer[0] === 0x1A
     && buffer[1] === 0x45

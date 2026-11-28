@@ -1,1 +1,35 @@
-{"meta":{"title":"通知音效","description":"在窗口处于后台时为任务完成、异常失败与等待确认事件播放主题短音效，支持静音、音量、分事件开关与防连响节流。"}}
+{
+  "meta": {
+    "title": "通知音效",
+    "description": "在窗口处于后台时为任务完成、异常失败与等待确认事件播放主题短音效，支持静音、音量、分事件开关与防连响节流。"
+  },
+  "ui": {
+    "nav": "通知音效",
+    "title": "通知音效",
+    "hint": "为任务完成、异常失败与等待确认配置提醒音效；用户主动取消任务保持静音。上传限制为 2 MB，最长播放 10 秒。",
+    "muted": "总静音",
+    "triggerMode": "触发时机",
+    "triggerBg": "仅后台或失焦",
+    "triggerAlways": "始终提醒",
+    "volume": "总音量",
+    "completed": "任务完成",
+    "failed": "异常失败",
+    "waiting": "等待用户确认",
+    "defaultSlot": "内置默认音效",
+    "noSlot": "未设置自定义音频",
+    "upload": "上传音频",
+    "reset": "恢复默认",
+    "preview": "试听",
+    "uploaded": "已更新并试听",
+    "resetDone": "已恢复默认",
+    "tooLarge": "音频文件超出大小限制。",
+    "decodeFailed": "当前环境无法解码该音频文件。",
+    "unsupported": "仅支持 WAV、MP3、OGG、M4A、FLAC、WebM 音频文件。",
+    "uploadFailed": "上传失败，请稍后重试。",
+    "unavailable": "宿主音频接口不可用。",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "已保存",
+    "loading": "加载中…"
+  }
+}
